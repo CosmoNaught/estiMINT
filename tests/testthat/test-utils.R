@@ -9,20 +9,22 @@ test_that("bin_variable creates correct number of bins", {
 })
 
 test_that("bin_variable handles edge cases", {
-  # Test with too few edges
+  # Test with sufficient edges (3 or more)
   vec <- 1:10
-  edges <- c(0, 11)
+  edges <- c(0, 5, 11)  # This creates 2 bins
   result <- bin_variable(vec, edges)
   
   expect_s3_class(result, "factor")
-  expect_equal(nlevels(result), 1)
+  expect_equal(nlevels(result), 2)  # Should have 2 levels
   
-  # Test with vector as factor when edges < 3
-  vec <- c("a", "b", "c")
-  edges <- c(0, 1)
-  result <- bin_variable(vec, edges)
+  # Test with too few edges (< 3) - should return factor of original values
+  vec_char <- c("a", "b", "c", "a", "b")
+  edges_few <- c(0, 1)  # Only 2 edges
+  result_few <- bin_variable(vec_char, edges_few)
   
-  expect_s3_class(result, "factor")
+  expect_s3_class(result_few, "factor")
+  # When edges < 3, it should factor the original values
+  expect_equal(nlevels(result_few), 3)  # a, b, c
 })
 
 test_that("create_default_bin_edges returns correct structure", {

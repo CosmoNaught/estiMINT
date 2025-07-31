@@ -77,7 +77,7 @@ plot_predictions_combined <- function(y_true, predictions_list, output_dir) {
            x = "Observed initial EIR (log10)",
            y = "Predicted initial EIR (log10)") +
       annotate("text", x = limits_exp[1] * 1.1, y = limits_exp[2] / 1.1,
-               label = sprintf("R² = %.3f\nRMSE = %.3f\nMAE = %.3f",
+               label = sprintf("R^2 = %.3f\nRMSE = %.3f\nMAE = %.3f",
                                r2, rmse, mae),
                hjust = 0, vjust = 1, size = 3.5, fontface = "italic") +
       coord_equal() +

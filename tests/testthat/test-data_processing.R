@@ -1,14 +1,9 @@
 test_that("get_timestep_window returns correct structure", {
-  # Mock connection and query result
-  mock_con <- list()
-  mock_table <- "test_table"
-  
-  # Create a mock dbGetQuery function
-  with_mock(
-    dbGetQuery = function(con, query) {
-      list(min_ts = 100)
-    },
+  with_mocked_bindings(
     {
+      mock_con <- list()
+      mock_table <- "test_table"
+      
       result <- get_timestep_window(mock_con, mock_table, y0 = 2, y1 = 3)
       
       expect_type(result, "list")
@@ -16,6 +11,9 @@ test_that("get_timestep_window returns correct structure", {
       expect_equal(result$start, 100 + 2*365)
       expect_equal(result$end, 100 + 3*365)
       expect_equal(result$data_start, 100)
+    },
+    dbGetQuery = function(con, query) {
+      list(min_ts = 100)
     }
   )
 })
@@ -30,13 +28,15 @@ test_that("clean_features handles missing columns", {
   
   result <- clean_features(df, feature_cols)
   
-  expect_s3_class(result, "matrix")
+  expect_true(is.matrix(result))
   expect_equal(ncol(result), 3)
   expect_equal(colnames(result), feature_cols)
   expect_true(all(result[, "col3"] == 0))
 })
 
 test_that("clean_features converts integer64 to numeric", {
+  skip_if_not_installed("bit64")
+  
   df <- data.frame(
     col1 = bit64::as.integer64(1:5),
     col2 = factor(c("a", "b", "c", "d", "e"))
