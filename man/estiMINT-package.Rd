@@ -6,7 +6,7 @@
 \alias{estiMINT-package}
 \title{estiMINT: Build and Evaluate EIR Prediction Models}
 \description{
-Tools for building XGBoost and Random Forest models to predict Entomological Inoculation Rate (EIR) from malariasimulation data.
+Tools for building XGBoost and Random Forest models to estimate Entomological Inoculation Rate (EIR) from malariasimulation data.
 }
 \author{
 \strong{Maintainer}: Cosmo Santoni \email{cosmo.santoni@imperial.ac.uk}

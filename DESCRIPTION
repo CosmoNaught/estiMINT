@@ -1,9 +1,9 @@
 Package: estiMINT
 Title: Build and Evaluate EIR Prediction Models
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: 
     person("Cosmo", "Santoni", , "cosmo.santoni@imperial.ac.uk", role = c("aut", "cre"))
-Description: Tools for building XGBoost and Random Forest models to predict
+Description: Tools for building XGBoost and Random Forest models to estimate
     Entomological Inoculation Rate (EIR) from malariasimulation data.
 License: MIT + file LICENSE
 Encoding: UTF-8
