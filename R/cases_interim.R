@@ -48,10 +48,8 @@ load_case_data <- function(con, table_name, ts,
       CAST(FLOOR( (t.timesteps - %d) / 365 ) AS INT) AS year,
 
       /* ---------- TARGET: annual clinical cases per 1000 ---------- */
-      AVG(
-        1000.0 * CAST(t.n_inc_clinical_0_36500 AS DOUBLE)
-        / NULLIF(t.n_age_0_36500, 0)
-      ) AS cases_per_1000,
+      1000.0 * SUM(t.n_inc_clinical_0_36500)
+              / NULLIF(SUM(t.n_age_0_36500), 0)  AS cases_per_1000,
 
       /* ---------- STATIC COVARIATES (mean or max as appropriate) ---------- */
       AVG(t.eir)            AS eir,
@@ -92,7 +90,7 @@ load_case_data <- function(con, table_name, ts,
 #'
 #' @inheritParams build_eir_models
 #' @param y_keep Integer vector of simulation years to keep when training
-#'               (default 0:5).  During prediction you must pass a column
+#'               (default 0:6).  During prediction you must pass a column
 #'               called **`year`** with a value 0–5 indicating the horizon
 #'               for which you want cases/1000.
 #' @return List: models, metrics, feature_cols, model_dir, plot_dir
@@ -100,8 +98,8 @@ load_case_data <- function(con, table_name, ts,
 build_case_models <- function(db_path,
                               model_dir = "model_parameters_cases",
                               plot_dir  = "training_plots_cases",
-                              plotting  = TRUE,
-                              y_keep    = 0:5,
+                              plotting  = FALSE,
+                              y_keep    = 0:6,
                               param_limit = NULL,
                               sim_limit   = NULL,
                               tune_hyperparams = TRUE) {

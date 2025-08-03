@@ -8,8 +8,8 @@ build_case_models(
   db_path,
   model_dir = "model_parameters_cases",
   plot_dir = "training_plots_cases",
-  plotting = TRUE,
-  y_keep = 0:5,
+  plotting = FALSE,
+  y_keep = 0:6,
   param_limit = NULL,
   sim_limit = NULL,
   tune_hyperparams = TRUE
@@ -25,7 +25,7 @@ build_case_models(
 \item{plotting}{Logical whether to generate plots (default: TRUE)}
 
 \item{y_keep}{Integer vector of simulation years to keep when training
-(default 0:5).  During prediction you must pass a column
+(default 0:6).  During prediction you must pass a column
 called \strong{\code{year}} with a value 0–5 indicating the horizon
 for which you want cases/1000.}
 
