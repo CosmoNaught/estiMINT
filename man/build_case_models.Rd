@@ -8,7 +8,7 @@ build_case_models(
   db_path,
   model_dir = "model_parameters_cases",
   plot_dir = "training_plots_cases",
-  plotting = FALSE,
+  plotting = TRUE,
   y_keep = 0:6,
   param_limit = NULL,
   sim_limit = NULL,

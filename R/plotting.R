@@ -109,7 +109,7 @@ plot_feature_importance_combined <- function(importance_list, output_dir, top_n 
   for (model_name in names(importance_list)) {
     imp <- importance_list[[model_name]]
 
-    if (model_name == "XGBoost") {
+    if (model_name == "XGBoost" || grepl("XGBoost", model_name)) {
       df <- imp[1:min(top_n, nrow(imp)), ]
       df$Feature      <- factor(df$Feature,
                                 levels = rev(df$Feature))
@@ -225,4 +225,157 @@ batch_cov_bin_plots <- function(y_true, predictions_list, df,
       output_dir      = output_dir
     )
   }
+}
+
+#' Create scatter plots for case predictions by year
+#'
+#' @param y_true Numeric vector of true case values
+#' @param predictions_list List of prediction vectors
+#' @param years Numeric vector of years
+#' @param output_dir Character path to output directory
+#' @export
+plot_case_predictions_by_year <- function(y_true, predictions_list,
+                                          years, output_dir) {
+
+  # Use linear scale for cases
+  limits <- range(c(y_true, unlist(predictions_list))) * c(0.95, 1.05)
+  
+  # Ensure lower limit is at least 0
+  limits[1] <- max(0, limits[1])
+
+  plots <- list()
+  for (model_name in names(predictions_list)) {
+    df <- data.frame(
+      true  = y_true,
+      pred  = predictions_list[[model_name]],
+      year  = factor(years)
+    )
+
+    plots[[model_name]] <-
+      ggplot(df, aes(true, pred, colour = year)) +
+      geom_point(alpha = .7, size = 2) +
+      geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+      geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+      ggplot2::scale_x_continuous(limits = limits) +
+      ggplot2::scale_y_continuous(limits = limits) +
+      labs(title  = paste(model_name, "- Obs vs Pred Cases/1000 (colour = year)"),
+           colour = "Year",
+           x = "Observed cases per 1000",
+           y = "Predicted cases per 1000") +
+      coord_equal() +
+      theme_bw() +
+      theme(plot.title   = element_text(face = "bold"),
+            aspect.ratio = 1)
+  }
+
+  combined <- gridExtra::arrangeGrob(grobs = plots, ncol = 2)
+  ggsave(file.path(output_dir, "case_predictions_scatter_by_year.png"),
+         combined, width = 16, height = 8, dpi = 300)
+}
+
+#' Create combined prediction scatter plots for cases
+#'
+#' @param y_true Numeric vector of true case values
+#' @param predictions_list List of prediction vectors
+#' @param output_dir Character path to output directory
+#' @export
+plot_case_predictions_combined <- function(y_true, predictions_list, output_dir) {
+
+  # Use linear scale for cases
+  limits <- range(c(y_true, unlist(predictions_list))) * c(0.95, 1.05)
+  
+  # Ensure lower limit is at least 0
+  limits[1] <- max(0, limits[1])
+
+  plots <- list()
+  for (model_name in names(predictions_list)) {
+    df <- data.frame(true = y_true,
+                     pred = predictions_list[[model_name]])
+
+    r2   <- 1 - sum((df$true - df$pred)^2) /
+                 sum((df$true - mean(df$true))^2)
+    rmse <- sqrt(mean((df$true - df$pred)^2))
+    mae  <- mean(abs(df$true - df$pred))
+
+    point_color <- if (grepl("XGBoost", model_name)) "#2166AC" else "#1B7837"
+
+    plots[[model_name]] <-
+      ggplot(df, aes(true, pred)) +
+      geom_point(alpha = .6, colour = point_color, size = 2) +
+      geom_abline(intercept = 0, slope = 1,
+                  colour = "red", linetype = "dashed", linewidth = 1) +
+      ggplot2::scale_x_continuous(limits = limits) +
+      ggplot2::scale_y_continuous(limits = limits) +
+      labs(title = paste(model_name, "- Observed vs Predicted Cases/1000"),
+           x = "Observed cases per 1000",
+           y = "Predicted cases per 1000") +
+      annotate("text", x = limits[1] + 0.05 * diff(limits), 
+               y = limits[2] - 0.05 * diff(limits),
+               label = sprintf("R^2 = %.3f\nRMSE = %.3f\nMAE = %.3f",
+                               r2, rmse, mae),
+               hjust = 0, vjust = 1, size = 3.5, fontface = "italic") +
+      coord_equal() +
+      theme_minimal() +
+      theme(plot.title   = element_text(size = 14, face = "bold"),
+            axis.title   = element_text(size = 12),
+            aspect.ratio = 1)
+  }
+
+  if (length(plots) > 1) {
+    combined <- gridExtra::arrangeGrob(grobs = plots, ncol = 2)
+    ggsave(file.path(output_dir, "case_predictions_scatter_combined.png"),
+           combined, width = 16, height = 8, dpi = 300)
+  } else {
+    ggsave(file.path(output_dir, "case_predictions_scatter_combined.png"),
+           plots[[1]], width = 8, height = 8, dpi = 300)
+  }
+}
+
+#' Plot case predictions by covariate bins with linear scale
+#'
+#' @param y_true Numeric vector of true case values
+#' @param predictions_list List of prediction vectors
+#' @param df Data frame containing covariates
+#' @param covariate Character name of covariate to plot
+#' @param edges Numeric vector of bin edges
+#' @param output_dir Character path to output directory
+#' @export
+plot_case_predictions_by_cov_bin <- function(y_true, predictions_list, df,
+                                             covariate, edges, output_dir) {
+
+  # Use linear scale for cases
+  limits <- range(c(y_true, unlist(predictions_list))) * c(0.95, 1.05)
+  limits[1] <- max(0, limits[1])
+
+  plots <- list()
+  for (model_name in names(predictions_list)) {
+    df_plot <- data.frame(
+      true  = y_true,
+      pred  = predictions_list[[model_name]],
+      bin   = bin_variable(df[[covariate]], edges)
+    )
+
+    plots[[model_name]] <-
+      ggplot(df_plot, aes(true, pred, colour = bin)) +
+      geom_point(alpha = .7, size = 2) +
+      geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+      geom_smooth(method = "lm", se = FALSE, linewidth = 1) +
+      ggplot2::scale_x_continuous(limits = limits) +
+      ggplot2::scale_y_continuous(limits = limits) +
+      labs(
+        title  = sprintf("%s - Obs vs Pred Cases/1000 (coloured by %s)", model_name, covariate),
+        colour = covariate,
+        x      = "Observed cases per 1000",
+        y      = "Predicted cases per 1000"
+      ) +
+      coord_equal() +
+      theme_bw() +
+      theme(plot.title   = element_text(face = "bold"),
+            aspect.ratio = 1)
+  }
+
+  combined <- gridExtra::arrangeGrob(grobs = plots, ncol = 2)
+  ggsave(file.path(output_dir,
+                   sprintf("case_predictions_scatter_by_%s.png", covariate)),
+         combined, width = 16, height = 8, dpi = 300)
 }

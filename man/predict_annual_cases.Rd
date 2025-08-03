@@ -2,8 +2,7 @@
 % Please edit documentation in R/cases_interim.R
 \name{predict_annual_cases}
 \alias{predict_annual_cases}
-\title{Predict annual clinical cases per 1000
-predict_annual}
+\title{Predict annual clinical cases per 1000}
 \usage{
 predict_annual_cases(model_obj, new_data, feature_cols)
 }
@@ -19,5 +18,4 @@ numeric vector of predictions
 }
 \description{
 Predict annual clinical cases per 1000
-predict_annual
 }
