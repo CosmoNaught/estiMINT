@@ -77,7 +77,7 @@ scenarios <- data.frame(
   itn_future = c(0.30, 0.60, 0.90),  # future ITN coverage
   irs_future = c(0.15, 0.40, 0.75),  # future IRS coverage
   lsm        = c(0.05, 0.45, 0.85),  # larval source management
-  year       = 4                      # prediction year (3-6)
+  year       = 4                      # prediction year 3-4
 )
 
 # Load pretrained models and predict
@@ -228,7 +228,7 @@ baseline_eir <- predict_initial_eir(eir_models$ensemble, baseline, eir_models$fe
 
 # Step 2: Project cases under different intervention scenarios
 intervention_scenarios <- data.frame(
-  scenario_name = c("Status quo", "Scale-up ITN", "Integrated"),
+  scenario_name = c("Scenario1", "Scenario2", "Scenario3"),
   eir          = baseline_eir,
   dn0_use      = baseline$dn0_use,
   dn0_future   = c(0.25, 0.30, 0.35),  # mosquito adaptation
@@ -243,7 +243,7 @@ intervention_scenarios <- data.frame(
   lsm          = c(0.00, 0.00, 0.50)
 )
 
-# Generate predictions for years 3-5
+# Generate predictions for years 3-6 (3-4, 4-5, 5-6)
 case_models <- load_pretrained_case_models()
 results <- list()
 
