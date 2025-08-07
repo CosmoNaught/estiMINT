@@ -131,3 +131,10 @@ load_pretrained_case_models <- function() {
   )
 }
 
+#' Get user max threads for paralellisation
+#'
+#' @return Max number of user threads
+#' @export
+get_threads <- function() {
+  max(1L, parallel::detectCores() - 1L)
+}

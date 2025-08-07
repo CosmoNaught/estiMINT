@@ -2,7 +2,9 @@
 % Please edit documentation in R/cases_interim.R
 \name{load_case_data}
 \alias{load_case_data}
-\title{Load simulation data to train annual-cases emulators}
+\title{containing the \emph{target} \code{cases_per_1000} and \strong{only} the 12 static
+covariates you specified, \strong{plus} the calendar year column.
+Only loads data from timesteps 2190-4380 (which we map to years 2-7).}
 \usage{
 load_case_data(
   con,
@@ -34,7 +36,7 @@ test set (default \code{0.2}).}
 \item{seed}{Integer random-seed for reproducible splits (default \code{42}).}
 }
 \description{
-Returns \strong{one row per} \{parameter_index × simulation_index × year\},
 containing the \emph{target} \code{cases_per_1000} and \strong{only} the 12 static
 covariates you specified, \strong{plus} the calendar year column.
+Only loads data from timesteps 2190-4380 (which we map to years 2-7).
 }

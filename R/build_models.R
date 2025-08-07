@@ -7,15 +7,32 @@
 #' @param param_limit Integer limit on parameter index (default: NULL)
 #' @param sim_limit Integer limit on simulations per parameter (default: NULL)
 #' @param tune_hyperparams Logical whether to tune hyperparameters (default: TRUE)
+#' @param data_dir Directory to store training data
+#' @param export_data Bool to export data
 #' @return List containing models, metrics, and feature columns
 #' @export
 build_eir_models <- function(db_path,
+                             data_dir  = "eir_data",
                              model_dir = "model_parameters",
                              plot_dir = "training_plots",
                              plotting = TRUE,
                              param_limit = NULL,
                              sim_limit = NULL,
-                             tune_hyperparams = TRUE) {
+                             tune_hyperparams = TRUE,
+                             export_data = TRUE) {
+  
+  if (!dir.exists(data_dir)) {
+    dir_created <- dir.create(data_dir, showWarnings = TRUE, recursive = TRUE)
+    if (!dir_created) {
+      full_path <- file.path(getwd(), data_dir)
+      dir_created <- dir.create(full_path, showWarnings = TRUE, recursive = TRUE)
+      if (!dir_created) {
+        stop(sprintf("Failed to create data directory: %s", data_dir))
+      }
+      data_dir <- full_path
+    }
+    message(sprintf("Created data directory: %s", data_dir))
+  }
 
   if (!dir.exists(model_dir)) {
     dir_created <- dir.create(model_dir, showWarnings = TRUE, recursive = TRUE)
@@ -64,6 +81,12 @@ build_eir_models <- function(db_path,
   message("Loading data...")
   dat <- load_sim_data(con, table_name, ts,
                        param_limit, sim_limit, seed = 42)
+
+  if (export_data) {
+    message("Writing data to disk...")
+    saveRDS(dat, paste0(data_dir, "/eir_data.RDS"))
+  }
+
   message(sprintf("Loaded %d rows (%d train, %d test)",
                   nrow(dat), sum(!dat$is_test), sum(dat$is_test)))
 

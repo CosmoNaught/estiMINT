@@ -6,17 +6,21 @@
 \usage{
 build_case_models(
   db_path,
+  data_dir = "case_data",
   model_dir = "model_parameters_cases",
   plot_dir = "training_plots_cases",
   plotting = TRUE,
   y_keep = 0:6,
   param_limit = NULL,
   sim_limit = NULL,
-  tune_hyperparams = TRUE
+  tune_hyperparams = TRUE,
+  export_data = TRUE
 )
 }
 \arguments{
 \item{db_path}{Character path to DuckDB database}
+
+\item{data_dir}{Directory to store training data}
 
 \item{model_dir}{Character path to save model artifacts (default: "model_parameters")}
 
@@ -34,6 +38,8 @@ for which you want cases/1000.}
 \item{sim_limit}{Integer limit on simulations per parameter (default: NULL)}
 
 \item{tune_hyperparams}{Logical whether to tune hyperparameters (default: TRUE)}
+
+\item{export_data}{Bool to export data}
 }
 \value{
 List: models, metrics, feature_cols, model_dir, plot_dir

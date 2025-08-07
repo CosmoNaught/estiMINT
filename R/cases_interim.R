@@ -1,8 +1,6 @@
-#' Load simulation data to train annual-cases emulators
-#'
-#' Returns **one row per** \{parameter_index × simulation_index × year\},
 #' containing the *target* `cases_per_1000` and **only** the 12 static
 #' covariates you specified, **plus** the calendar year column.  
+#' Only loads data from timesteps 2190-4380 (which we map to years 2-7).
 #'
 #' @param con           A live `DBI` connection (e.g. `duckdb::duckdb()`).
 #' @param table_name    Character. Name of the table holding simulation output.
@@ -22,7 +20,6 @@ load_case_data <- function(con, table_name, ts,
                            test_fraction   = 0.2,
                            seed            = 42) {
 
-
   param_filter <- if (!is.null(param_limit))
     sprintf("WHERE parameter_index < %d", param_limit) else ""
 
@@ -38,21 +35,30 @@ load_case_data <- function(con, table_name, ts,
     sprintf("SELECT DISTINCT parameter_index, simulation_index
              FROM %s %s", table_name, param_filter)
 
+  # Map timesteps to year indices 0-5:
   sql <- sprintf("
     WITH sel AS (%s)
     SELECT
       s.parameter_index,
       s.simulation_index,
 
-      /* ---------- horizon (0-based calendar year) ---------- */
-      CAST(FLOOR( (t.timesteps - %d) / 365 ) AS INT) AS year,
+      /* Map timesteps to year indices 0-5 */
+      CASE 
+        WHEN t.timesteps >= 2190 AND t.timesteps < 2555 THEN 0
+        WHEN t.timesteps >= 2555 AND t.timesteps < 2920 THEN 1
+        WHEN t.timesteps >= 2920 AND t.timesteps < 3285 THEN 2
+        WHEN t.timesteps >= 3285 AND t.timesteps < 3650 THEN 3
+        WHEN t.timesteps >= 3650 AND t.timesteps < 4015 THEN 4
+        WHEN t.timesteps >= 4015 AND t.timesteps <= 4380 THEN 5
+        ELSE NULL
+      END AS year,
 
       /* ---------- TARGET: annual clinical cases per 1000 ---------- */
       1000.0 * SUM(t.n_inc_clinical_0_36500)
               / NULLIF(SUM(t.n_age_0_36500), 0)  AS cases_per_1000,
 
       /* ---------- STATIC COVARIATES (mean or max as appropriate) ---------- */
-      AVG(t.eir)            AS eir,
+      MAX(t.eir)            AS eir,
       MAX(t.dn0_use)        AS dn0_use,
       MAX(t.dn0_future)     AS dn0_future,
       MAX(t.Q0)             AS Q0,
@@ -67,14 +73,19 @@ load_case_data <- function(con, table_name, ts,
 
     FROM %s t
     JOIN sel s USING (parameter_index, simulation_index)
+    WHERE t.timesteps >= 2190 AND t.timesteps <= 4380  -- Use ALL data from years 6-12
     GROUP BY 1, 2, 3
-    HAVING cases_per_1000 IS NOT NULL",
-    sim_sampling, ts$data_start, table_name)
+    HAVING cases_per_1000 IS NOT NULL AND year IS NOT NULL",
+    sim_sampling, table_name)
 
   dat <- DBI::dbGetQuery(con, sql)
   dat <- dat[order(dat$parameter_index,
                    dat$simulation_index,
                    dat$year), ]
+
+  message(sprintf("Loaded %d rows for timesteps 2190-4380", nrow(dat)))
+  message(sprintf("Year mapping: 0=timesteps 2190-2555, 1=2555-2920, 2=2920-3285, 3=3285-3650, 4=3650-4015, 5=4015-4380"))
+  message(sprintf("Unique years in data: %s", paste(sort(unique(dat$year)), collapse=", ")))
 
   set.seed(seed)
   unique_params <- unique(dat$parameter_index)
@@ -96,13 +107,30 @@ load_case_data <- function(con, table_name, ts,
 #' @return List: models, metrics, feature_cols, model_dir, plot_dir
 #' @export
 build_case_models <- function(db_path,
+                              data_dir  = "case_data",
                               model_dir = "model_parameters_cases",
                               plot_dir  = "training_plots_cases",
                               plotting  = TRUE,
                               y_keep    = 0:6,
                               param_limit = NULL,
                               sim_limit   = NULL,
-                              tune_hyperparams = TRUE) {
+                              tune_hyperparams = TRUE,
+                              export_data = TRUE) {
+
+
+
+  if (!dir.exists(data_dir)) {
+    dir_created <- dir.create(data_dir, showWarnings = TRUE, recursive = TRUE)
+    if (!dir_created) {
+      full_path <- file.path(getwd(), data_dir)
+      dir_created <- dir.create(full_path, showWarnings = TRUE, recursive = TRUE)
+      if (!dir_created) {
+        stop(sprintf("Failed to create data directory: %s", data_dir))
+      }
+      data_dir <- full_path
+    }
+    message(sprintf("Created data directory: %s", data_dir))
+  }
 
   if (!dir.exists(model_dir)) {
     dir_created <- dir.create(model_dir, showWarnings = TRUE, recursive = TRUE)
@@ -139,6 +167,11 @@ build_case_models <- function(db_path,
   dat <- load_case_data(con, "simulation_results", ts,
                         param_limit, sim_limit,
                         seed = 42)
+
+  if (export_data) {
+    message("Writing data to disk...")
+    saveRDS(dat, paste0(data_dir, "/case_data.RDS"))
+  }
 
   dat <- subset(dat, year %in% y_keep)
   message(sprintf("Loaded %d rows for years %s", 
@@ -235,39 +268,7 @@ build_case_models <- function(db_path,
       `RandomForest (cases)` = rf_model$importance
     )
     plot_feature_importance_combined(importance_list, plot_dir)
-    
-    # Covariate bin plots
-    covariates_to_plot <- c(
-      "year", "eir", 
-      "dn0_use", "dn0_future",
-      "Q0", "phi_bednets",
-      "seasonal", "routine",
-      "itn_use", "irs_use",
-      "itn_future", "irs_future",
-      "lsm"
-    )
-    
-    bin_edges <- create_default_bin_edges()
-    
-    batch_cov_bin_plots(
-      y_true = y_test,
-      predictions_list = predictions_list,
-      df = test_data,
-      covariates = covariates_to_plot,
-      bin_edges = bin_edges,
-      output_dir = plot_dir
-    )
-    
-    # Save plot data for verification
-    plot_data <- data.frame(
-      y_true = y_test,
-      year = test_data$year,
-      xgb_pred = predictions_list$`XGBoost (cases)`,
-      rf_pred = predictions_list$`RandomForest (cases)`
-    )
-    write.csv(plot_data, 
-              file.path(plot_dir, "case_plot_data_verification.csv"), 
-              row.names = FALSE)
+
   }
 
   # Save models with consistent naming

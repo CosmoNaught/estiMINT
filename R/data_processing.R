@@ -7,12 +7,23 @@
 #' @return List with start, end, and data_start timesteps
 #' @export
 get_timestep_window <- function(con, table_name, y0 = 2, y1 = 3) {
-  min_ts <- dbGetQuery(con, sprintf(
-    "SELECT MIN(timesteps) AS min_ts FROM %s", table_name))[["min_ts"]]
-  list(start = min_ts + y0*365,
-       end   = min_ts + y1*365,
-       data_start = min_ts)
+  # To match case model's relative years within 2190-4380 window
+  # Year 2 = timesteps 2920-3285, Year 3 = timesteps 3285-3650
+  if (y0 == 2 && y1 == 3) {
+    # Use the same relative mapping as case models
+    list(start = 2920,
+         end   = 3650,
+         data_start = 2190)  # Start of the intervention period
+  } else {
+    # Original behavior for other uses
+    min_ts <- dbGetQuery(con, sprintf(
+      "SELECT MIN(timesteps) AS min_ts FROM %s", table_name))[["min_ts"]]
+    list(start = min_ts + y0*365,
+         end   = min_ts + y1*365,
+         data_start = min_ts)
+  }
 }
+
 
 #' Load simulation data with train/test split
 #'

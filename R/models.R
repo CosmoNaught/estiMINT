@@ -9,7 +9,7 @@
 #' @export
 train_xgboost <- function(X_train, y_train, X_val = NULL, y_val = NULL,
                           tune_params = TRUE) {
-
+  message("XGB using", get_threads(), "cores")
   y_train_log <- log10(y_train + 1)
   dtrain <- xgb.DMatrix(data = X_train, label = y_train_log)
 
@@ -29,7 +29,8 @@ train_xgboost <- function(X_train, y_train, X_val = NULL, y_val = NULL,
     colsample_bytree = 0.7,
     gamma = 0.1,
     alpha = 0.1,
-    lambda = 1.0
+    lambda = 1.0,
+    nthread = get_threads()
   )
 
   if (tune_params) {
@@ -110,7 +111,8 @@ train_random_forest <- function(X_train, y_train,
             max.depth = 10,
             sample.fraction = 0.632,
             importance = "impurity",
-            seed = 42
+            seed = 42,
+            num.threads = get_threads()
           )
           if (rf$prediction.error < best_oob_error) {
             best_oob_error <- rf$prediction.error
