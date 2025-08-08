@@ -20,6 +20,8 @@ Imports:
     gridExtra,
     scales,
     stats,
+    future,
+    future.apply,
     utils
 Suggests:
     testthat (>= 3.0.0),

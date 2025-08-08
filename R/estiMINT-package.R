@@ -6,6 +6,8 @@
 #' @importFrom duckdb duckdb
 #' @importFrom xgboost xgb.DMatrix xgb.cv xgb.train xgb.importance
 #' @importFrom ranger  ranger
+#' @importFrom future plan multisession
+#' @importFrom future.apply future_lapply future_sapply
 #' @importFrom utils   modifyList
 #' @importFrom ggplot2 ggplot aes geom_point geom_abline geom_smooth geom_bar
 #'   scale_x_log10 scale_y_log10 labs coord_equal theme_bw theme_minimal

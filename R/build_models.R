@@ -20,6 +20,7 @@ build_eir_models <- function(db_path,
                              sim_limit = NULL,
                              tune_hyperparams = TRUE,
                              export_data = TRUE) {
+  plan(multisession, workers = get_threads())
   
   if (!dir.exists(data_dir)) {
     dir_created <- dir.create(data_dir, showWarnings = TRUE, recursive = TRUE)
