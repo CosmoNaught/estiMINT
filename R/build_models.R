@@ -251,3 +251,194 @@ build_eir_models <- function(db_path,
 
   invisible(out)
 }
+
+#' Build annual-case prediction models (cases/1000)
+#'
+#' @inheritParams build_eir_models
+#' @param y_keep Integer vector of simulation years to keep when training
+#'               (default 0:6).  During prediction you must pass a column
+#'               called **`year`** with a value 0–5 indicating the horizon
+#'               for which you want cases/1000.
+#' @return List: models, metrics, feature_cols, model_dir, plot_dir
+#' @export
+build_case_models <- function(db_path,
+                              data_dir  = "case_data",
+                              model_dir = "model_parameters_cases",
+                              plot_dir  = "training_plots_cases",
+                              plotting  = TRUE,
+                              y_keep    = 0:6,
+                              param_limit = NULL,
+                              sim_limit   = NULL,
+                              tune_hyperparams = TRUE,
+                              export_data = TRUE) {
+
+  plan(multisession, workers = get_threads()) 
+
+  if (!dir.exists(data_dir)) {
+    dir_created <- dir.create(data_dir, showWarnings = TRUE, recursive = TRUE)
+    if (!dir_created) {
+      full_path <- file.path(getwd(), data_dir)
+      dir_created <- dir.create(full_path, showWarnings = TRUE, recursive = TRUE)
+      if (!dir_created) {
+        stop(sprintf("Failed to create data directory: %s", data_dir))
+      }
+      data_dir <- full_path
+    }
+    message(sprintf("Created data directory: %s", data_dir))
+  }
+
+  if (!dir.exists(model_dir)) {
+    dir_created <- dir.create(model_dir, showWarnings = TRUE, recursive = TRUE)
+    if (!dir_created) {
+      full_path <- file.path(getwd(), model_dir)
+      dir_created <- dir.create(full_path, showWarnings = TRUE, recursive = TRUE)
+      if (!dir_created) {
+        stop(sprintf("Failed to create model directory: %s", model_dir))
+      }
+      model_dir <- full_path
+    }
+    message(sprintf("Created model directory: %s", model_dir))
+  }
+  
+  if (plotting && !dir.exists(plot_dir)) {
+    dir_created <- dir.create(plot_dir, showWarnings = TRUE, recursive = TRUE)
+    if (!dir_created) {
+      full_path <- file.path(getwd(), plot_dir)
+      dir_created <- dir.create(full_path, showWarnings = TRUE, recursive = TRUE)
+      if (!dir_created) {
+        stop(sprintf("Failed to create plot directory: %s", plot_dir))
+      }
+      plot_dir <- full_path
+    }
+    message(sprintf("Created plot directory: %s", plot_dir))
+  }
+
+  ## ------------------------------------------------------------------------
+  con <- dbConnect(duckdb::duckdb(), db_path, read_only = TRUE)
+  on.exit(dbDisconnect(con))
+
+  ts  <- get_timestep_window(con, "simulation_results")
+  message("Loading case data...")
+  dat <- load_case_data(con, "simulation_results", ts,
+                        param_limit, sim_limit,
+                        seed = 42)
+
+  if (export_data) {
+    message("Writing data to disk...")
+    saveRDS(dat, paste0(data_dir, "/case_data.RDS"))
+  }
+
+  dat <- subset(dat, year %in% y_keep)
+  message(sprintf("Loaded %d rows for years %s", 
+                  nrow(dat), paste(range(y_keep), collapse="-")))
+
+  feature_cols <- c(
+    "year",  
+    "eir",
+    "dn0_use",    "dn0_future",
+    "Q0",         "phi_bednets",
+    "seasonal",   "routine",
+    "itn_use",    "irs_use",
+    "itn_future", "irs_future",
+    "lsm"
+  )
+
+  set.seed(42)
+  train_idx <- dat$is_test == FALSE
+  test_idx  <- dat$is_test == TRUE
+
+  train_data <- dat[train_idx, ]
+  test_data  <- dat[test_idx,  ]
+
+  set.seed(42)
+  val_flag         <- sample(nrow(train_data)) < 0.2 * nrow(train_data)
+  val_data         <- train_data[val_flag, ]
+  train_data       <- train_data[!val_flag, ]
+
+  message(sprintf("Data split - Train: %d, Val: %d, Test: %d", 
+                  nrow(train_data), nrow(val_data), nrow(test_data)))
+  message(sprintf("Cases/1000 range - Train: [%.2f, %.2f], Test: [%.2f, %.2f]", 
+                  min(train_data$cases_per_1000), max(train_data$cases_per_1000),
+                  min(test_data$cases_per_1000), max(test_data$cases_per_1000)))
+
+  X_train <- clean_features(train_data, feature_cols)
+  X_val   <- clean_features(val_data,   feature_cols)
+  X_test  <- clean_features(test_data,  feature_cols)
+
+  y_train <- train_data$cases_per_1000
+  y_val   <- val_data$cases_per_1000
+  y_test  <- test_data$cases_per_1000
+
+  validate_data(X_train, y_train, "Train")
+  validate_data(X_val,   y_val,   "Validation")
+  validate_data(X_test,  y_test,  "Test")
+
+  message("Training XGBoost (cases)...")
+  xgb_model <- train_xgboost(X_train, y_train,
+                             X_val, y_val,
+                             tune_params = tune_hyperparams)
+
+  message("Training Random Forest (cases)...")
+  rf_model  <- train_random_forest(X_train, y_train,
+                                   X_val, y_val,
+                                   tune_params = tune_hyperparams)
+
+  message("Evaluating models on test set...")
+  xgb_eval <- evaluate_model(xgb_model, X_test, y_test, "XGBoost-Cases")
+  rf_eval  <- evaluate_model(rf_model,  X_test, y_test, "RandomForest-Cases")
+
+  metrics_df <- rbind(xgb_eval$metrics, rf_eval$metrics)
+  print(metrics_df)
+  
+  csv_path <- file.path(model_dir, "case_model_metrics.csv")
+  tryCatch({
+    write.csv(metrics_df, csv_path, row.names = FALSE)
+    message(sprintf("Wrote metrics to: %s", csv_path))
+  }, error = function(e) {
+    warning(sprintf("Could not write metrics CSV: %s", e$message))
+  })
+
+  if (plotting) {
+    predictions_list <- list(
+      `XGBoost (cases)`      = xgb_eval$predictions,
+      `RandomForest (cases)` = rf_eval$predictions
+    )
+    
+    message("Creating case prediction plots...")
+    
+    # Use the case-specific plotting function
+    plot_case_predictions_combined(y_test, predictions_list, plot_dir)
+    
+    # Plot by year
+    plot_case_predictions_by_year(
+      y_true = y_test,
+      predictions_list = predictions_list,
+      years = test_data$year,
+      output_dir = plot_dir
+    )
+    
+    # Feature importance
+    importance_list <- list(
+      `XGBoost (cases)`      = xgb_model$importance,
+      `RandomForest (cases)` = rf_model$importance
+    )
+    plot_feature_importance_combined(importance_list, plot_dir)
+
+  }
+
+  # Save models with consistent naming
+  saveRDS(xgb_model,  file.path(model_dir, "xgb_cases_model.rds"))
+  saveRDS(rf_model,   file.path(model_dir, "rf_cases_model.rds"))
+  saveRDS(feature_cols,
+          file.path(model_dir, "case_feature_columns.rds"))
+
+  out <- list(
+    models       = list(xgboost_cases = xgb_model, rf_cases = rf_model),
+    metrics      = metrics_df,
+    feature_cols = feature_cols,
+    model_dir    = model_dir,
+    plot_dir     = plot_dir
+  )
+
+  invisible(out)
+}
