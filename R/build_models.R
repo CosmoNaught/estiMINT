@@ -252,13 +252,16 @@ build_eir_models <- function(db_path,
   invisible(out)
 }
 
-#' Build annual-case prediction models (cases/1000)
+#' Build annual-case prediction models with enhanced stratification and weighting
 #'
 #' @inheritParams build_eir_models
 #' @param y_keep Integer vector of simulation years to keep when training
 #'               (default 0:6).  During prediction you must pass a column
 #'               called **`year`** with a value 0–5 indicating the horizon
 #'               for which you want cases/1000.
+#' @param use_case_weights Logical whether to use dynamic case-based weights (default: TRUE)
+#' @param weight_power Numeric power for weight calculation (default: 0.5)
+#' @param stratified_eval Logical whether to compute stratified metrics (default: TRUE)
 #' @return List: models, metrics, feature_cols, model_dir, plot_dir
 #' @export
 build_case_models <- function(db_path,
@@ -270,7 +273,10 @@ build_case_models <- function(db_path,
                               param_limit = NULL,
                               sim_limit   = NULL,
                               tune_hyperparams = TRUE,
-                              export_data = TRUE) {
+                              export_data = TRUE,
+                              use_case_weights = TRUE,
+                              weight_power = 0.75,
+                              stratified_eval = TRUE) {
 
   plan(multisession, workers = get_threads()) 
 
@@ -332,6 +338,21 @@ build_case_models <- function(db_path,
   message(sprintf("Loaded %d rows for years %s", 
                   nrow(dat), paste(range(y_keep), collapse="-")))
 
+  # Print distribution summary for awareness
+  case_summary <- summary(dat$cases_per_1000)
+  message("\nCase distribution summary:")
+  message(sprintf("  Min: %.2f, Q1: %.2f, Median: %.2f, Mean: %.2f, Q3: %.2f, Max: %.2f",
+                  case_summary[1], case_summary[2], case_summary[3], 
+                  case_summary[4], case_summary[5], case_summary[6]))
+  
+  # Show distribution by quantiles
+  q_vals <- quantile(dat$cases_per_1000, probs = c(0.5, 0.75, 0.9, 0.95, 0.99, 1))
+  message("\nPercentile thresholds:")
+  for (i in seq_along(q_vals)) {
+    message(sprintf("  %s%%: %.2f cases/1000", 
+                   names(q_vals)[i], q_vals[i]))
+  }
+
   feature_cols <- c(
     "year",  
     "eir",
@@ -373,27 +394,54 @@ build_case_models <- function(db_path,
   validate_data(X_val,   y_val,   "Validation")
   validate_data(X_test,  y_test,  "Test")
 
-  message("Training XGBoost (cases)...")
+  message("\nTraining XGBoost (cases) with enhanced weighting...")
+  if (use_case_weights) {
+    message("  Using dynamic case-based weights with Tweedie distribution")
+  }
+  
   xgb_model <- train_xgboost(X_train, y_train,
                              X_val, y_val,
-                             tune_params = tune_hyperparams)
+                             tune_params = tune_hyperparams,
+                             use_case_weights = use_case_weights,
+                             weight_power = weight_power)
 
-  message("Training Random Forest (cases)...")
+  message("\nTraining Random Forest (cases) with enhanced weighting...")
+  if (use_case_weights) {
+    message("  Using dynamic case-based weights")
+  }
+  
   rf_model  <- train_random_forest(X_train, y_train,
                                    X_val, y_val,
-                                   tune_params = tune_hyperparams)
+                                   tune_params = tune_hyperparams,
+                                   use_case_weights = use_case_weights,
+                                   weight_power = weight_power)
 
-  message("Evaluating models on test set...")
-  xgb_eval <- evaluate_model(xgb_model, X_test, y_test, "XGBoost-Cases")
-  rf_eval  <- evaluate_model(rf_model,  X_test, y_test, "RandomForest-Cases")
+  message("\nEvaluating models on test set with stratified metrics...")
+  xgb_eval <- evaluate_model(xgb_model, X_test, y_test, 
+                            "XGBoost-Cases",
+                            stratified_eval = stratified_eval)
+  rf_eval  <- evaluate_model(rf_model,  X_test, y_test, 
+                            "RandomForest-Cases",
+                            stratified_eval = stratified_eval)
 
+  # Combine metrics
   metrics_df <- rbind(xgb_eval$metrics, rf_eval$metrics)
-  print(metrics_df)
   
-  csv_path <- file.path(model_dir, "case_model_metrics.csv")
+  # Print condensed metrics comparison
+  message("\n=== Overall Performance Comparison ===")
+  print(metrics_df[, c("Model", "RMSE", "MAE", "R2", "Correlation")])
+  
+  if (stratified_eval) {
+    message("\n=== High-Case Performance (top 5%) ===")
+    if (all(c("RMSE_High", "MAE_High", "Bias_High") %in% names(metrics_df))) {
+      print(metrics_df[, c("Model", "RMSE_High", "MAE_High", "Bias_High", "N_High")])
+    }
+  }
+  
+  csv_path <- file.path(model_dir, "case_model_metrics_enhanced.csv")
   tryCatch({
     write.csv(metrics_df, csv_path, row.names = FALSE)
-    message(sprintf("Wrote metrics to: %s", csv_path))
+    message(sprintf("\nWrote enhanced metrics to: %s", csv_path))
   }, error = function(e) {
     warning(sprintf("Could not write metrics CSV: %s", e$message))
   })
@@ -423,12 +471,26 @@ build_case_models <- function(db_path,
       `RandomForest (cases)` = rf_model$importance
     )
     plot_feature_importance_combined(importance_list, plot_dir)
-
+    
+    # Additional stratified performance plot
+    if (stratified_eval) {
+      plot_stratified_performance(metrics_df, plot_dir)
+    }
   }
 
-  # Save models with consistent naming
-  saveRDS(xgb_model,  file.path(model_dir, "xgb_cases_model.rds"))
-  saveRDS(rf_model,   file.path(model_dir, "rf_cases_model.rds"))
+  # Save models with metadata about training configuration
+  model_metadata <- list(
+    use_case_weights = use_case_weights,
+    weight_power = weight_power,
+    stratified_eval = stratified_eval,
+    training_date = Sys.Date(),
+    data_summary = summary(dat$cases_per_1000)
+  )
+  
+  saveRDS(list(model = xgb_model, metadata = model_metadata),  
+          file.path(model_dir, "xgb_cases_model_enhanced.rds"))
+  saveRDS(list(model = rf_model, metadata = model_metadata),   
+          file.path(model_dir, "rf_cases_model_enhanced.rds"))
   saveRDS(feature_cols,
           file.path(model_dir, "case_feature_columns.rds"))
 
@@ -437,7 +499,8 @@ build_case_models <- function(db_path,
     metrics      = metrics_df,
     feature_cols = feature_cols,
     model_dir    = model_dir,
-    plot_dir     = plot_dir
+    plot_dir     = plot_dir,
+    metadata     = model_metadata
   )
 
   invisible(out)

@@ -138,3 +138,12 @@ load_pretrained_case_models <- function() {
 get_threads <- function() {
   max(1L, parallel::detectCores() - 1L)
 }
+
+#' Build metric string for Tweedie loss
+#'
+#' @param rho Tweedie variance power (1–2)
+#' @return Character scalar like "tweedie-nloglik@1.50"
+#' @export
+make_metric <- function(rho) {
+  sprintf("tweedie-nloglik@%.2f", rho)
+}

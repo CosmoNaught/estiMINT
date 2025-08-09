@@ -379,3 +379,101 @@ plot_case_predictions_by_cov_bin <- function(y_true, predictions_list, df,
                    sprintf("case_predictions_scatter_by_%s.png", covariate)),
          combined, width = 16, height = 8, dpi = 300)
 }
+
+#' Plot stratified performance comparison
+#'
+#' @param metrics_df Data frame with stratified metrics
+#' @param output_dir Character path to output directory
+#' @export
+plot_stratified_performance <- function(metrics_df, output_dir) {
+  library(ggplot2)
+  library(tidyr)
+  library(dplyr)
+  
+  # Extract RMSE columns for different quantiles
+  rmse_cols <- grep("^RMSE_[0-9]", names(metrics_df), value = TRUE)
+  
+  if (length(rmse_cols) > 0) {
+    # Reshape for plotting
+    plot_data <- metrics_df %>%
+      select(Model, all_of(rmse_cols)) %>%
+      pivot_longer(cols = all_of(rmse_cols), 
+                   names_to = "Quantile", 
+                   values_to = "RMSE") %>%
+      mutate(Quantile = gsub("RMSE_", "", Quantile))
+    
+    # Create bar plot
+    p <- ggplot(plot_data, aes(x = Quantile, y = RMSE, fill = Model)) +
+      geom_bar(stat = "identity", position = "dodge", alpha = 0.8) +
+      labs(title = "Stratified RMSE by Case Quantiles",
+           x = "Case Quantile Range",
+           y = "RMSE") +
+      theme_minimal() +
+      theme(plot.title = element_text(size = 14, face = "bold"),
+            axis.text.x = element_text(angle = 45, hjust = 1)) +
+      scale_fill_manual(values = c("XGBoost-Cases" = "#2166AC", 
+                                   "RandomForest-Cases" = "#1B7837"))
+    
+    ggsave(file.path(output_dir, "stratified_performance.png"),
+           p, width = 10, height = 6, dpi = 300)
+  }
+}
+
+#' Generate diagnostic plots for case predictions
+#'
+#' @param predictions_df Data frame from compare_case_predictions
+#' @param output_dir Character path to output directory
+#' @export  
+plot_case_diagnostics <- function(predictions_df, output_dir) {
+  library(ggplot2)
+  library(tidyr)
+  
+  if ("true_value" %in% names(predictions_df)) {
+    # Reshape for plotting
+    pred_cols <- grep("_pred$", names(predictions_df), value = TRUE)
+    model_names <- gsub("_pred$", "", pred_cols)
+    
+    plot_data <- predictions_df %>%
+      select(row_id, true_value, case_range, all_of(pred_cols)) %>%
+      pivot_longer(cols = all_of(pred_cols),
+                   names_to = "model",
+                   values_to = "prediction") %>%
+      mutate(model = gsub("_pred$", "", model))
+    
+    # Scatter plot by case range
+    p1 <- ggplot(plot_data, aes(x = true_value, y = prediction, color = model)) +
+      geom_point(alpha = 0.5) +
+      geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
+      facet_wrap(~case_range, scales = "free") +
+      labs(title = "Predictions by Case Range",
+           x = "True Cases/1000",
+           y = "Predicted Cases/1000") +
+      theme_minimal() +
+      scale_color_manual(values = c("xgboost_cases" = "#2166AC",
+                                   "rf_cases" = "#1B7837"))
+    
+    ggsave(file.path(output_dir, "case_diagnostics_by_range.png"),
+           p1, width = 12, height = 8, dpi = 300)
+    
+    # Error distribution plot
+    error_data <- predictions_df %>%
+      select(row_id, case_range, all_of(grep("_error$", names(.), value = TRUE))) %>%
+      pivot_longer(cols = -c(row_id, case_range),
+                   names_to = "model",
+                   values_to = "error") %>%
+      mutate(model = gsub("_error$", "", model))
+    
+    p2 <- ggplot(error_data, aes(x = case_range, y = error, fill = model)) +
+      geom_boxplot(alpha = 0.7) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+      labs(title = "Prediction Errors by Case Range",
+           x = "Case Range (cases/1000)",
+           y = "Prediction Error") +
+      theme_minimal() +
+      scale_fill_manual(values = c("xgboost_cases" = "#2166AC",
+                                  "rf_cases" = "#1B7837"))
+    
+    ggsave(file.path(output_dir, "case_error_distribution.png"),
+           p2, width = 10, height = 6, dpi = 300)
+  }
+}

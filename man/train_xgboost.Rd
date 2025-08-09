@@ -2,9 +2,17 @@
 % Please edit documentation in R/models.R
 \name{train_xgboost}
 \alias{train_xgboost}
-\title{Train XGBoost model for EIR prediction}
+\title{Train XGBoost model for case prediction with dynamic weighting}
 \usage{
-train_xgboost(X_train, y_train, X_val = NULL, y_val = NULL, tune_params = TRUE)
+train_xgboost(
+  X_train,
+  y_train,
+  X_val = NULL,
+  y_val = NULL,
+  tune_params = TRUE,
+  use_case_weights = TRUE,
+  weight_power = 0.7
+)
 }
 \arguments{
 \item{X_train}{Numeric matrix of training features}
@@ -16,10 +24,14 @@ train_xgboost(X_train, y_train, X_val = NULL, y_val = NULL, tune_params = TRUE)
 \item{y_val}{Numeric vector of validation targets (default: NULL)}
 
 \item{tune_params}{Logical whether to tune hyperparameters (default: TRUE)}
+
+\item{use_case_weights}{Logical whether to use dynamic case weights (default: TRUE)}
+
+\item{weight_power}{Numeric power for weight calculation (default: 0.5)}
 }
 \value{
 List containing model, parameters, and transformation functions
 }
 \description{
-Train XGBoost model for EIR prediction
+Train XGBoost model for case prediction with dynamic weighting
 }

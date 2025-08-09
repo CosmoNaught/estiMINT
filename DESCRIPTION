@@ -19,6 +19,8 @@ Imports:
     ggplot2,
     gridExtra,
     scales,
+    lhs,
+    progressr,
     stats,
     future,
     future.apply,
