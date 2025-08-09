@@ -11,7 +11,7 @@
 #' @importFrom utils modifyList zip unzip read.csv write.csv capture.output
 #' @importFrom lhs maximinLHS
 #' @importFrom tools md5sum
-#' @importFrom piggyback pb_upload pb_download pb_list pb_new_release
+#' @importFrom piggyback pb_upload pb_download pb_list pb_new_release pb_releases
 #' @importFrom rappdirs user_cache_dir
 #' @importFrom R.utils withTimeout
 #' @importFrom gh gh gh_token

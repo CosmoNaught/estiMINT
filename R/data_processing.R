@@ -182,7 +182,7 @@ load_case_data <- function(con, table_name, ts,
     dat$cases_per_1000
   )
   
-  message(sprintf("Applied zero threshold (%.4f): %d values set to 0", 
+  message(sprintf("Applied zero threshold (%.4f): %d values set to 0",
                   zero_threshold, 
                   sum(dat$cases_per_1000 == 0 & dat$cases_per_1000_raw > 0)))
   
