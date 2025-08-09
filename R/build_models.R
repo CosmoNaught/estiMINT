@@ -143,18 +143,18 @@ build_eir_models <- function(db_path,
                   y_test[1], y_test[2], y_test[3], y_test[4], y_test[5]))
 
   message("Training XGBoost...")
-  xgb_model <- train_xgboost(X_train, y_train,
+  xgb_model <- train_eir_xgboost(X_train, y_train,
                              X_val, y_val,
                              tune_params = tune_hyperparams)
 
   message("Training Random Forest...")
-  rf_model  <- train_random_forest(X_train, y_train,
+  rf_model  <- train_eir_random_forest(X_train, y_train,
                                    X_val, y_val,
                                    tune_params = tune_hyperparams)
 
   message("Evaluating (test)...")
-  xgb_eval <- evaluate_model(xgb_model, X_test, y_test, "XGBoost")
-  rf_eval  <- evaluate_model(rf_model,  X_test, y_test, "RandomForest")
+  xgb_eval <- evaluate_eir_model(xgb_model, X_test, y_test, "XGBoost")
+  rf_eval  <- evaluate_eir_model(rf_model,  X_test, y_test, "RandomForest")
   
   message(sprintf("Test set size for predictions: XGB=%d, RF=%d", 
                   length(xgb_eval$predictions), length(rf_eval$predictions)))
