@@ -730,19 +730,6 @@ devtools::document()
 
 ---
 
-## Citation
-
-If you use estiMINT in your research, please cite:
-
-```bibtex
-@software{estimint2025,
-  title = {estiMINT: Machine Learning Models for Malaria Transmission Estimation},
-  author = {MINTverse Development Team},
-  year = {2025},
-  url = {https://github.com/CosmoNaught/estiMINT}
-}
-```
-
 ---
 
 ## License
@@ -757,7 +744,6 @@ estiMINT builds upon the broader MINTverse ecosystem and benefits from:
 - The `malariasimulation` package for generating training data
 - The XGBoost and ranger communities for excellent ML implementations
 - DuckDB for efficient data processing
-- The global malaria modeling community for domain expertise
 
 ---
 
