@@ -438,7 +438,7 @@ build_case_models <- function(db_path,
     }
   }
   
-  csv_path <- file.path(model_dir, "case_model_metrics_enhanced.csv")
+  csv_path <- file.path(model_dir, "case_model_metrics.csv")
   tryCatch({
     write.csv(metrics_df, csv_path, row.names = FALSE)
     message(sprintf("\nWrote enhanced metrics to: %s", csv_path))
@@ -488,9 +488,9 @@ build_case_models <- function(db_path,
   )
   
   saveRDS(list(model = xgb_model, metadata = model_metadata),  
-          file.path(model_dir, "xgb_cases_model_enhanced.rds"))
+          file.path(model_dir, "xgb_cases_model.rds"))
   saveRDS(list(model = rf_model, metadata = model_metadata),   
-          file.path(model_dir, "rf_cases_model_enhanced.rds"))
+          file.path(model_dir, "rf_cases_model.rds"))
   saveRDS(feature_cols,
           file.path(model_dir, "case_feature_columns.rds"))
 

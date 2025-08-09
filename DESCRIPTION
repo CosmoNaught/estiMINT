@@ -18,6 +18,7 @@ Imports:
     data.table,
     ggplot2,
     gridExtra,
+    httr,
     scales,
     gh,
     lhs,
