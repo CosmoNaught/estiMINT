@@ -2,10 +2,10 @@
 % Please edit documentation in R/utils.R
 \name{load_pretrained_eir_models}
 \alias{load_pretrained_eir_models}
-\title{Load the pretrained EIR models that ship with \emph{estiMINT}}
+\title{Load the pretrained EIR models}
 \usage{
 load_pretrained_eir_models()
 }
 \description{
-Load the pretrained EIR models that ship with \emph{estiMINT}
+Load the pretrained EIR models
 }
