@@ -173,6 +173,19 @@ load_case_data <- function(con, table_name, ts,
     sim_sampling, table_name)
 
   dat <- DBI::dbGetQuery(con, sql)
+  zero_threshold  <- 0.01
+    # Apply threshold to target variable
+  dat$cases_per_1000_raw <- dat$cases_per_1000  # Keep original
+  dat$cases_per_1000 <- ifelse(
+    dat$cases_per_1000 < zero_threshold,
+    0,
+    dat$cases_per_1000
+  )
+  
+  message(sprintf("Applied zero threshold (%.4f): %d values set to 0", 
+                  zero_threshold, 
+                  sum(dat$cases_per_1000 == 0 & dat$cases_per_1000_raw > 0)))
+  
   dat <- dat[order(dat$parameter_index,
                    dat$simulation_index,
                    dat$year), ]

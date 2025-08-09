@@ -34,7 +34,7 @@ train_xgboost <- function(X_train, y_train, X_val = NULL, y_val = NULL,
     weights[y >= y_q75] <- 4
     weights[y >= y_q90] <- 8
     weights[y >= y_q95] <- 16
-    weights[y >= y_q99] <- 32
+    weights[y >= y_q99] <- 128
     
     # Additional boost for extreme outliers (top 1%)
     extreme_threshold <- quantile(y, 0.99)
@@ -273,7 +273,7 @@ train_random_forest <- function(X_train, y_train,
     weights[y >= y_q75] <- 4
     weights[y >= y_q90] <- 8
     weights[y >= y_q95] <- 16
-    weights[y >= y_q99] <- 32
+    weights[y >= y_q99] <- 128
     
     extreme_threshold <- quantile(y, 0.99)
     is_extreme <- y >= extreme_threshold
@@ -315,20 +315,20 @@ train_random_forest <- function(X_train, y_train,
     
     set.seed(42)
     
-    BUDGET <- 16
-    # 4 dims: num_trees, mtry_frac, min_node, max_depth
+    # REDUCED BUDGET for stability
+    BUDGET <- 16  # Reduced from 16
     L <- lhs::maximinLHS(BUDGET, 4)
     
     linmap <- function(u, lo, hi) lo + u * (hi - lo)
     
     grid <- data.frame(
-      num_trees = as.integer(round(linmap(L[,1], 1500, 3000) / 100) * 100),  # More trees
-      mtry_frac = linmap(L[,2], 0.4, 0.7),  # Slightly higher mtry
-      min_node  = as.integer(round(linmap(L[,3], 1, 8))),  # Allow smaller nodes
-      max_depth = as.integer(round(linmap(L[,4], 16, 30)))  # Deeper trees
+      num_trees = as.integer(round(linmap(L[,1], 1000, 2000) / 100) * 100),  # Reduced from 3000
+      mtry_frac = linmap(L[,2], 0.4, 0.7),
+      min_node  = as.integer(round(linmap(L[,3], 1, 8))),
+      max_depth = as.integer(round(linmap(L[,4], 16, 25)))  # Reduced from 30
     )
     
-    # Setup progress handlers
+    # Setup progress handlers with error handling
     handlers(global = TRUE)
     message(sprintf("Testing %d parameter combinations (LHS)...", nrow(grid)))
     
@@ -336,93 +336,180 @@ train_random_forest <- function(X_train, y_train,
     old_plan <- future::plan()
     on.exit(future::plan(old_plan), add = TRUE)
     
-    # Use multisession for better stability
-    workers <- min(8L, nrow(grid))
-    future::plan(future::multisession, workers = workers)
+    # Use fewer workers for stability
+    workers <- min(4L, nrow(grid))  # Reduced from 8
+    future::plan(
+      future::multisession, 
+      workers = workers,
+      gc = TRUE  # Enable garbage collection
+    )
     per_combo_threads <- max(1L, floor(get_threads() / workers))
     
     # Suppress RNG warnings for ranger
     oopt <- options(future.rng.onMisuse = "ignore")
     on.exit(options(oopt), add = TRUE, after = FALSE)
     
-    # Run parallel tuning with progress bar
-    results <- with_progress({
-      p <- progressor(steps = nrow(grid))
-      
-      future_lapply(seq_len(nrow(grid)), function(i) {
-        # Load ranger in the worker
-        library(ranger)
+    # Run with better error handling
+    results <- tryCatch({
+      with_progress({
+        p <- progressor(steps = nrow(grid))
         
-        start_time <- Sys.time()
+        future_lapply(seq_len(nrow(grid)), function(i) {
+          # Load ranger in worker
+          library(ranger)
+          
+          # Add error handling within worker
+          result <- tryCatch({
+            g <- grid[i, ]
+            mtry_val <- max(1, floor(g$mtry_frac * ncol(X_train)))
+            
+            # Add timeout protection (if needed)
+            rf_fit <- withTimeout({
+              ranger(
+                y ~ .,
+                data             = train_df,
+                num.trees        = g$num_trees,
+                mtry             = mtry_val,
+                min.node.size    = g$min_node,
+                max.depth        = g$max_depth,
+                sample.fraction  = 0.632,  # Reduced from 0.8 for memory
+                replace          = TRUE,
+                case.weights     = case_weights,
+                importance       = "none",
+                verbose          = FALSE,
+                seed             = 42,
+                num.threads      = per_combo_threads
+              )
+            }, timeout = 300, onTimeout = "error")  # 5 minute timeout per model
+            
+            oob_error <- rf_fit$prediction.error
+            
+            # Aggressive cleanup
+            rm(rf_fit)
+            gc(verbose = FALSE, full = TRUE)
+            
+            list(
+              oob = oob_error,
+              params = list(
+                num.trees     = g$num_trees,
+                mtry          = mtry_val,
+                min.node.size = g$min_node,
+                max.depth     = g$max_depth
+              ),
+              error = NULL
+            )
+            
+          }, error = function(e) {
+            # Return NA result on error
+            list(
+              oob = NA,
+              params = list(
+                num.trees     = g$num_trees,
+                mtry          = mtry_val,
+                min.node.size = g$min_node,
+                max.depth     = g$max_depth
+              ),
+              error = as.character(e)
+            )
+          })
+          
+          # Update progress
+          if (!is.null(result$error)) {
+            p(message = sprintf("[%d/%d] Failed: %s", i, nrow(grid), result$error))
+          } else {
+            p(message = sprintf(
+              "[%d/%d] trees=%d, mtry=%d, OOB=%.4f",
+              i, nrow(grid), g$num_trees, mtry_val, result$oob
+            ))
+          }
+          
+          return(result)
+        },
+        future.seed = TRUE,
+        future.packages = c("ranger", "R.utils"),
+        future.globals = list(
+          train_df = train_df,
+          case_weights = case_weights,
+          X_train = X_train,
+          grid = grid,
+          per_combo_threads = per_combo_threads
+        ),
+        future.chunk.size = 1  # Process one at a time for stability
+        )
+      })
+    }, error = function(e) {
+      message("Parallel tuning failed, falling back to sequential...")
+      
+      # Fallback to sequential processing
+      results_seq <- list()
+      for (i in seq_len(nrow(grid))) {
         g <- grid[i, ]
         mtry_val <- max(1, floor(g$mtry_frac * ncol(X_train)))
         
-        # Train RF model
-        rf <- ranger(
-          y ~ ., 
-          data = train_df,
-          num.trees     = g$num_trees,
-          mtry          = mtry_val,
-          min.node.size = g$min_node,
-          max.depth     = g$max_depth,
-          sample.fraction = 0.8,
-          replace       = TRUE,
-          case.weights  = case_weights,
-          importance    = "none",  # Set to "none" for tuning (faster)
-          seed          = 42,
-          num.threads   = per_combo_threads  # Use allocated threads
-        )
-        
-        # CRITICAL FIX: Store the error BEFORE removing rf
-        oob_error <- rf$prediction.error
-        
-        elapsed <- as.numeric(difftime(Sys.time(), start_time, units = "secs"))
-        
-        # Update progress with detailed message
-        p(message = sprintf("[%d/%d] trees=%d, mtry=%d, min.node=%d, depth=%d | %.1fs | OOB=%.4f",
-                            i, nrow(grid),
-                            g$num_trees, mtry_val, g$min_node, g$max_depth,
-                            elapsed,
-                            oob_error))  # Use stored value
-        
-        # Clean up to save memory
-        rm(rf)
-        gc(verbose = FALSE)
-        
-        list(
-          oob = oob_error,  # Use stored value
-          params = list(
+        rf_fit <- tryCatch({
+          ranger(
+            y ~ .,
+            data = train_df,
             num.trees = g$num_trees,
             mtry = mtry_val,
             min.node.size = g$min_node,
-            max.depth = g$max_depth
+            max.depth = g$max_depth,
+            sample.fraction = 0.632,
+            replace = TRUE,
+            case.weights = case_weights,
+            importance = "none",
+            verbose = FALSE,
+            seed = 42,
+            num.threads = get_threads()
           )
-        )
-      }, 
-      future.seed = TRUE,
-      future.packages = c("ranger"),  # Ensure ranger is loaded in workers
-      future.globals = list(  # Pass needed objects explicitly
-        train_df = train_df,
-        case_weights = case_weights,
-        X_train = X_train,
-        grid = grid,
-        get_threads = get_threads
-      ))
+        }, error = function(e) NULL)
+        
+        if (!is.null(rf_fit)) {
+          results_seq[[i]] <- list(
+            oob = rf_fit$prediction.error,
+            params = list(
+              num.trees = g$num_trees,
+              mtry = mtry_val,
+              min.node.size = g$min_node,
+              max.depth = g$max_depth
+            )
+          )
+          message(sprintf("[%d/%d] OOB: %.4f", i, nrow(grid), rf_fit$prediction.error))
+        } else {
+          results_seq[[i]] <- list(oob = NA, params = list())
+        }
+        
+        rm(rf_fit); gc(verbose = FALSE)
+      }
+      results_seq
     })
     
-    # Find best result
-    best_idx <- which.min(vapply(results, `[[`, numeric(1), "oob"))
-    best <- results[[best_idx]]
-    params <- best$params
-    best_oob_error <- best$oob
+    # Filter out failed results
+    valid_results <- results[!sapply(results, function(x) is.na(x$oob))]
     
-    message(sprintf(
-      "Best RF: trees=%d, mtry=%d, min.node=%d, max.depth=%d, OOB-error=%.4f",
-      params$num.trees, params$mtry, params$min.node.size, params$max.depth, best_oob_error))
+    if (length(valid_results) == 0) {
+      message("All tuning attempts failed, using default parameters")
+      params <- list(
+        num.trees = 1000,
+        mtry = floor(0.5 * ncol(X_train)),
+        min.node.size = 5,
+        max.depth = 20
+      )
+    } else {
+      # Find best valid result
+      best_idx <- which.min(vapply(valid_results, `[[`, numeric(1), "oob"))
+      best <- valid_results[[best_idx]]
+      params <- best$params
+      best_oob_error <- best$oob
+      
+      message(sprintf(
+        "Best RF: trees=%d, mtry=%d, min.node=%d, max.depth=%d, OOB-error=%.4f",
+        params$num.trees, params$mtry, params$min.node.size, params$max.depth, best_oob_error))
+    }
     
   } else {
     params <- list(
-      num.trees = 1500,
+      num.trees = 1000,
       mtry = floor(0.5 * ncol(X_train)),
       min.node.size = 5,
       max.depth = 20
@@ -438,11 +525,11 @@ train_random_forest <- function(X_train, y_train,
     mtry = params$mtry,
     min.node.size = params$min.node.size,
     max.depth = params$max.depth,
-    sample.fraction = 0.8,
+    sample.fraction = 0.632,
     replace = TRUE,
     case.weights = case_weights,
-    importance = "impurity",  # Enable for final model
-    num.threads = get_threads(),  # Use all threads for final model
+    importance = "impurity",
+    num.threads = get_threads(),
     seed = 42
   )
   

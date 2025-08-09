@@ -123,7 +123,6 @@ load_pretrained_case_models <- function() {
     xgboost_cases = xgb,
     rf_cases      = rf,
     feature_cols  = feats,
-    # backwards-compatible structure used by build_case_models()
     models        = list(
       xgboost_cases = xgb,
       rf_cases      = rf
@@ -136,7 +135,7 @@ load_pretrained_case_models <- function() {
 #' @return Max number of user threads
 #' @export
 get_threads <- function() {
-  max(1L, parallel::detectCores() - 1L)
+  max(1L, parallel::detectCores() - 4L)
 }
 
 #' Build metric string for Tweedie loss
