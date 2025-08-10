@@ -1,22 +1,28 @@
-test_that("get_timestep_window returns correct structure", {
+test_that("get_timestep_window uses fixed 2–3 mapping", {
+  # No DB call on purpose in this branch
+  res <- get_timestep_window(con = NULL, table_name = "ignored", y0 = 2, y1 = 3)
+  expect_type(res, "list")
+  expect_equal(names(res), c("start", "end", "data_start"))
+  expect_equal(res$start, 2920)
+  expect_equal(res$end, 3650)
+  expect_equal(res$data_start, 2190)
+})
+
+test_that("get_timestep_window uses DB-based mapping for other ranges", {
   with_mocked_bindings(
     {
-      mock_con <- list()
-      mock_table <- "test_table"
-      
-      result <- get_timestep_window(mock_con, mock_table, y0 = 2, y1 = 3)
-      
-      expect_type(result, "list")
-      expect_equal(names(result), c("start", "end", "data_start"))
-      expect_equal(result$start, 100 + 2*365)
-      expect_equal(result$end, 100 + 3*365)
-      expect_equal(result$data_start, 100)
+      res <- get_timestep_window(mock_con, "test_table", y0 = 1, y1 = 2)
+      expect_type(res, "list")
+      expect_equal(names(res), c("start", "end", "data_start"))
+      expect_equal(res$start, 100 + 1*365)
+      expect_equal(res$end,   100 + 2*365)
+      expect_equal(res$data_start, 100)
     },
-    dbGetQuery = function(con, query) {
-      list(min_ts = 100)
-    }
+    # If your implementation calls dbGetQuery unqualified, leave as is:
+    dbGetQuery = function(con, query) list(min_ts = 100)
   )
 })
+
 
 test_that("clean_features handles missing columns", {
   # Create test data

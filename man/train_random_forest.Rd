@@ -2,14 +2,16 @@
 % Please edit documentation in R/models.R
 \name{train_random_forest}
 \alias{train_random_forest}
-\title{Train Random Forest model for EIR prediction}
+\title{Train Random Forest model for case prediction}
 \usage{
 train_random_forest(
   X_train,
   y_train,
   X_val = NULL,
   y_val = NULL,
-  tune_params = TRUE
+  tune_params = TRUE,
+  use_case_weights = TRUE,
+  weight_power = 0.8
 )
 }
 \arguments{
@@ -22,10 +24,14 @@ train_random_forest(
 \item{y_val}{Numeric vector of validation targets (default: NULL)}
 
 \item{tune_params}{Logical whether to tune hyperparameters (default: TRUE)}
+
+\item{use_case_weights}{Logical whether to use dynamic case weights (default: TRUE)}
+
+\item{weight_power}{Numeric power for weight calculation (default: 0.8)}
 }
 \value{
 List containing model, parameters, and transformation functions
 }
 \description{
-Train Random Forest model for EIR prediction
+Train Random Forest model for case prediction
 }

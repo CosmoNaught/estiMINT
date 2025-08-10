@@ -6,16 +6,20 @@
 \usage{
 build_eir_models(
   db_path,
+  data_dir = "eir_data",
   model_dir = "model_parameters",
   plot_dir = "training_plots",
   plotting = TRUE,
   param_limit = NULL,
   sim_limit = NULL,
-  tune_hyperparams = TRUE
+  tune_hyperparams = TRUE,
+  export_data = TRUE
 )
 }
 \arguments{
 \item{db_path}{Character path to DuckDB database}
+
+\item{data_dir}{Directory to store training data}
 
 \item{model_dir}{Character path to save model artifacts (default: "model_parameters")}
 
@@ -28,6 +32,8 @@ build_eir_models(
 \item{sim_limit}{Integer limit on simulations per parameter (default: NULL)}
 
 \item{tune_hyperparams}{Logical whether to tune hyperparameters (default: TRUE)}
+
+\item{export_data}{Bool to export data}
 }
 \value{
 List containing models, metrics, and feature columns

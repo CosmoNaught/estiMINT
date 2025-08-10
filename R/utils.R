@@ -42,92 +42,79 @@ bin_variable <- function(vec, edges, prefix = "B") {
   }
 }
 
-#' Load the pretrained EIR models that ship with *estiMINT*
+#' Load the pretrained EIR models
 #' @export
 load_pretrained_eir_models <- function() {
-
-  model_dir <- system.file("extdata/eir_model", package = "estiMINT")
-  if (model_dir == "")
-    stop("Pre-trained model files were not found in this installation of estiMINT.")
-
   paths <- c(
-    xgboost      = file.path(model_dir, "xgboost_model.rds"),
-    rf_model     = file.path(model_dir, "rf_model.rds"),
-    feature_cols = file.path(model_dir, "feature_columns.rds")
+    xgboost      = .model_path("eir_model/xgboost_model.rds"),
+    rf_model     = .model_path("eir_model/rf_model.rds"),
+    feature_cols = .model_path("eir_model/feature_columns.rds")
   )
-
-  missing <- paths[!base::file.exists(unname(paths))]
-  if (length(missing))
-    stop(
-      "The following pretrained model files are missing: ",
-      paste(basename(missing), collapse = ", ")
-    )
-
+  missing <- paths[!file.exists(unname(paths))]
+  if (length(missing)) stop("Missing EIR model files: ", paste(basename(missing), collapse = ", "))
   xgb   <- readRDS(paths["xgboost"])
   rf    <- readRDS(paths["rf_model"])
   feats <- readRDS(paths["feature_cols"])
-
   list(
-    # direct handles
     xgboost      = xgb,
     rf_model     = rf,
     feature_cols = feats,
-    # backwards-compatible structure used by build_eir_models()
-    models       = list(
-      xgboost  = xgb,
-      rf_model = rf
-    )
+    models       = list(xgboost = xgb, rf_model = rf)
   )
 }
 
-#' Load the pretrained case prediction models that ship with *estiMINT*
+#' Load the pretrained case models
 #' @export
 load_pretrained_case_models <- function() {
-
-  model_dir <- system.file("extdata/case_model", package = "estiMINT")
-  if (model_dir == "")
-    stop("Pre-trained model files were not found in this installation of estiMINT.")
+  # support either naming convention
+  cand <- list(
+    xgb1 = "case_model/xgb_cases_model.rds",
+    xgb2 = "case_model/xgboost_cases_model.rds"
+  )
+  xgb_path <- .model_path(if (file.exists(.model_path(cand$xgb1))) cand$xgb1 else cand$xgb2)
 
   paths <- c(
-    xgboost_cases = file.path(model_dir, "xgb_cases_model.rds"),
-    rf_cases      = file.path(model_dir, "rf_cases_model.rds"),
-    feature_cols  = file.path(model_dir, "case_feature_columns.rds")
+    xgboost_cases = xgb_path,
+    rf_cases      = .model_path("case_model/rf_cases_model.rds"),
+    feature_cols  = .model_path("case_model/case_feature_columns.rds")
   )
-
-  missing <- paths[!base::file.exists(unname(paths))]
-  if (length(missing)) {
-    # Try alternative naming convention
-    alt_paths <- c(
-      xgboost_cases = file.path(model_dir, "xgboost_cases_model.rds"),
-      rf_cases      = file.path(model_dir, "rf_cases_model.rds"),
-      feature_cols  = file.path(model_dir, "case_feature_columns.rds")
-    )
-    
-    alt_missing <- alt_paths[!file.exists(alt_paths)]
-    if (length(alt_missing)) {
-      stop(
-        "The following pretrained case model files are missing: ",
-        paste(basename(missing), collapse = ", ")
-      )
-    } else {
-      paths <- alt_paths
-    }
-  }
-
+  missing <- paths[!file.exists(unname(paths))]
+  if (length(missing)) stop("Missing case model files: ", paste(basename(missing), collapse = ", "))
   xgb   <- readRDS(paths["xgboost_cases"])
   rf    <- readRDS(paths["rf_cases"])
   feats <- readRDS(paths["feature_cols"])
-
   list(
-    # direct handles
     xgboost_cases = xgb,
     rf_cases      = rf,
     feature_cols  = feats,
-    # backwards-compatible structure used by build_case_models()
-    models        = list(
-      xgboost_cases = xgb,
-      rf_cases      = rf
-    )
+    models        = list(xgboost_cases = xgb, rf_cases = rf)
   )
 }
 
+
+#' Get user max threads for paralellisation
+#' @param a standard deviation of covariate a
+#' @param b standard deviation of covariate b
+#' @return Max number of user threads
+#' @export
+safe_cor <- function(a, b) {
+  if (stats::sd(a) == 0 || stats::sd(b) == 0) return(NA_real_)
+  stats::cor(a, b)
+}
+
+#' Get user max threads for paralellisation
+#'
+#' @return Max number of user threads
+#' @export
+get_threads <- function() {
+  max(1L, parallel::detectCores() - 4L)
+}
+
+#' Build metric string for Tweedie loss
+#'
+#' @param rho Tweedie variance power (1–2)
+#' @return Character scalar like "tweedie-nloglik@1.50"
+#' @export
+make_metric <- function(rho) {
+  sprintf("tweedie-nloglik@%.2f", rho)
+}

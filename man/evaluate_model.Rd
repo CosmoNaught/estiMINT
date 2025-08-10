@@ -2,9 +2,15 @@
 % Please edit documentation in R/evaluation.R
 \name{evaluate_model}
 \alias{evaluate_model}
-\title{Evaluate model performance}
+\title{Evaluate model performance with stratified metrics}
 \usage{
-evaluate_model(model_obj, X_test, y_test, model_label = "Model")
+evaluate_model(
+  model_obj,
+  X_test,
+  y_test,
+  model_label = "Model",
+  stratified_eval = TRUE
+)
 }
 \arguments{
 \item{model_obj}{Model object from train_xgboost or train_random_forest}
@@ -14,10 +20,12 @@ evaluate_model(model_obj, X_test, y_test, model_label = "Model")
 \item{y_test}{Numeric vector of test targets}
 
 \item{model_label}{Character label for the model}
+
+\item{stratified_eval}{Logical whether to compute stratified metrics (default: TRUE)}
 }
 \value{
 List with predictions and metrics data frame
 }
 \description{
-Evaluate model performance
+Evaluate model performance with stratified metrics
 }

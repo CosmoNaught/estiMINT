@@ -2,10 +2,10 @@
 % Please edit documentation in R/utils.R
 \name{load_pretrained_case_models}
 \alias{load_pretrained_case_models}
-\title{Load the pretrained case prediction models that ship with \emph{estiMINT}}
+\title{Load the pretrained case models}
 \usage{
 load_pretrained_case_models()
 }
 \description{
-Load the pretrained case prediction models that ship with \emph{estiMINT}
+Load the pretrained case models
 }

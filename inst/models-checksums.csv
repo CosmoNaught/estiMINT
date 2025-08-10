@@ -1,0 +1,9 @@
+"path","md5","size_B"
+"eir_model/feature_columns.rds","4832e3d29c55d65533d025cda9560ce5",125
+"eir_model/model_metrics.csv","729c98a61a0dc4046a17a3722eb4c15b",244
+"eir_model/rf_model.rds","94a2ca287ff906bf14292650c8ae31cc",48765958
+"eir_model/xgboost_model.rds","27f748cb1b9ecba24d1cd62b9cdeaa9c",2172676
+"case_model/case_feature_columns.rds","029422381e9ccdc4298ea877ce1575d0",146
+"case_model/case_model_metrics.csv","56cd371a8629c40c3c711928c85c7d7d",1308
+"case_model/rf_cases_model.rds","eacb4fd09bd01164a4e9262949cf98da",951303486
+"case_model/xgb_cases_model.rds","a1d590c24475e2d7e2d3a738cfac463c",8009466
