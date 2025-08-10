@@ -12,29 +12,25 @@ RoxygenNote: 7.3.2
 Imports:
     DBI,
     duckdb,
-    bit64,
     xgboost,
     ranger,
-    data.table,
     ggplot2,
     gridExtra,
     httr,
-    scales,
     gh,
     lhs,
     R.utils,
     piggyback,
     rappdirs,
-    utils,
     tools,
     progressr,
     stats,
     future,
     future.apply,
+    dplyr,
+    tidyr,
     utils
 Suggests:
     testthat (>= 3.0.0),
-    knitr,
-    rmarkdown
+    bit64
 Config/testthat/edition: 3
-VignetteBuilder: knitr

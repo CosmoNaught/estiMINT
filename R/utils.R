@@ -93,6 +93,16 @@ load_pretrained_case_models <- function() {
 
 
 #' Get user max threads for paralellisation
+#' @param a standard deviation of covariate a
+#' @param b standard deviation of covariate b
+#' @return Max number of user threads
+#' @export
+safe_cor <- function(a, b) {
+  if (stats::sd(a) == 0 || stats::sd(b) == 0) return(NA_real_)
+  stats::cor(a, b)
+}
+
+#' Get user max threads for paralellisation
 #'
 #' @return Max number of user threads
 #' @export

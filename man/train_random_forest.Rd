@@ -24,6 +24,10 @@ train_random_forest(
 \item{y_val}{Numeric vector of validation targets (default: NULL)}
 
 \item{tune_params}{Logical whether to tune hyperparameters (default: TRUE)}
+
+\item{use_case_weights}{Logical whether to use dynamic case weights (default: TRUE)}
+
+\item{weight_power}{Numeric power for weight calculation (default: 0.8)}
 }
 \value{
 List containing model, parameters, and transformation functions

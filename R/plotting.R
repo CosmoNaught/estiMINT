@@ -386,9 +386,6 @@ plot_case_predictions_by_cov_bin <- function(y_true, predictions_list, df,
 #' @param output_dir Character path to output directory
 #' @export
 plot_stratified_performance <- function(metrics_df, output_dir) {
-  library(ggplot2)
-  library(tidyr)
-  library(dplyr)
   
   # Extract RMSE columns for different quantiles
   rmse_cols <- grep("^RMSE_[0-9]", names(metrics_df), value = TRUE)
@@ -396,11 +393,11 @@ plot_stratified_performance <- function(metrics_df, output_dir) {
   if (length(rmse_cols) > 0) {
     # Reshape for plotting
     plot_data <- metrics_df %>%
-      select(Model, all_of(rmse_cols)) %>%
-      pivot_longer(cols = all_of(rmse_cols), 
+      dplyr::select(Model, dplyr::all_of(rmse_cols)) %>%
+      tidyr::pivot_longer(cols = dplyr::all_of(rmse_cols), 
                    names_to = "Quantile", 
                    values_to = "RMSE") %>%
-      mutate(Quantile = gsub("RMSE_", "", Quantile))
+      dplyr::mutate(Quantile = gsub("RMSE_", "", Quantile))
     
     # Create bar plot
     p <- ggplot(plot_data, aes(x = Quantile, y = RMSE, fill = Model)) +
@@ -411,7 +408,7 @@ plot_stratified_performance <- function(metrics_df, output_dir) {
       theme_minimal() +
       theme(plot.title = element_text(size = 14, face = "bold"),
             axis.text.x = element_text(angle = 45, hjust = 1)) +
-      scale_fill_manual(values = c("XGBoost-Cases" = "#2166AC", 
+      ggplot2::scale_fill_manual(values = c("XGBoost-Cases" = "#2166AC", 
                                    "RandomForest-Cases" = "#1B7837"))
     
     ggsave(file.path(output_dir, "stratified_performance.png"),
@@ -425,8 +422,6 @@ plot_stratified_performance <- function(metrics_df, output_dir) {
 #' @param output_dir Character path to output directory
 #' @export  
 plot_case_diagnostics <- function(predictions_df, output_dir) {
-  library(ggplot2)
-  library(tidyr)
   
   if ("true_value" %in% names(predictions_df)) {
     # Reshape for plotting
@@ -434,22 +429,22 @@ plot_case_diagnostics <- function(predictions_df, output_dir) {
     model_names <- gsub("_pred$", "", pred_cols)
     
     plot_data <- predictions_df %>%
-      select(row_id, true_value, case_range, all_of(pred_cols)) %>%
-      pivot_longer(cols = all_of(pred_cols),
+      dplyr::select(row_id, true_value, case_range, dplyr::all_of(pred_cols)) %>%
+      tidyr::pivot_longer(cols = dplyr::all_of(pred_cols),
                    names_to = "model",
                    values_to = "prediction") %>%
-      mutate(model = gsub("_pred$", "", model))
+      dplyr::mutate(model = gsub("_pred$", "", model))
     
     # Scatter plot by case range
     p1 <- ggplot(plot_data, aes(x = true_value, y = prediction, color = model)) +
       geom_point(alpha = 0.5) +
       geom_abline(intercept = 0, slope = 1, linetype = "dashed") +
-      facet_wrap(~case_range, scales = "free") +
+      ggplot2::facet_wrap(~case_range, scales = "free") +
       labs(title = "Predictions by Case Range",
            x = "True Cases/1000",
            y = "Predicted Cases/1000") +
       theme_minimal() +
-      scale_color_manual(values = c("xgboost_cases" = "#2166AC",
+      ggplot2::scale_color_manual(values = c("xgboost_cases" = "#2166AC",
                                    "rf_cases" = "#1B7837"))
     
     ggsave(file.path(output_dir, "case_diagnostics_by_range.png"),
@@ -457,20 +452,20 @@ plot_case_diagnostics <- function(predictions_df, output_dir) {
     
     # Error distribution plot
     error_data <- predictions_df %>%
-      select(row_id, case_range, all_of(grep("_error$", names(.), value = TRUE))) %>%
-      pivot_longer(cols = -c(row_id, case_range),
+      dplyr::select(row_id, case_range, dplyr::all_of(grep("_error$", names(.), value = TRUE))) %>%
+      tidyr::pivot_longer(cols = -c(row_id, case_range),
                    names_to = "model",
                    values_to = "error") %>%
-      mutate(model = gsub("_error$", "", model))
+      dplyr::mutate(model = gsub("_error$", "", model))
     
     p2 <- ggplot(error_data, aes(x = case_range, y = error, fill = model)) +
-      geom_boxplot(alpha = 0.7) +
-      geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+      ggplot2::geom_boxplot(alpha = 0.7) +
+      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
       labs(title = "Prediction Errors by Case Range",
            x = "Case Range (cases/1000)",
            y = "Prediction Error") +
       theme_minimal() +
-      scale_fill_manual(values = c("xgboost_cases" = "#2166AC",
+      ggplot2::scale_fill_manual(values = c("xgboost_cases" = "#2166AC",
                                   "rf_cases" = "#1B7837"))
     
     ggsave(file.path(output_dir, "case_error_distribution.png"),

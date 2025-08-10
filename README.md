@@ -377,7 +377,7 @@ new_data_cases$ensemble_cases_per_1000 <- (xgb_predictions + rf_predictions) / 2
 
 # Summarize by year
 results <- new_data_cases %>%
-  mutate(
+  dplyr::mutate(
     scenario = rep(1:2, each = length(years)),
     year_label = case_when(
       year == 2 ~ "Year 2-3 (timesteps 2920-3285)",

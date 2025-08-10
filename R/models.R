@@ -148,9 +148,7 @@ if (tune_params) {
     p <- progressor(steps = nrow(grid))
     
     future_lapply(seq_len(nrow(grid)), function(i) {
-      # Import xgboost in the worker
-      library(xgboost)
-      
+
       g <- grid[i, ]
       params <- modifyList(base_params, list(
         max_depth = g$max_depth,
@@ -261,6 +259,8 @@ if (tune_params) {
 #' @param X_val Numeric matrix of validation features (default: NULL)
 #' @param y_val Numeric vector of validation targets (default: NULL)
 #' @param tune_params Logical whether to tune hyperparameters (default: TRUE)
+#' @param use_case_weights Logical whether to use dynamic case weights (default: TRUE)
+#' @param weight_power Numeric power for weight calculation (default: 0.8)
 #' @return List containing model, parameters, and transformation functions
 #' @export
 train_random_forest <- function(X_train, y_train,
@@ -364,8 +364,6 @@ train_random_forest <- function(X_train, y_train,
         p <- progressor(steps = nrow(grid))
         
         future_lapply(seq_len(nrow(grid)), function(i) {
-          # Load ranger in worker
-          library(ranger)
           
           # Add error handling within worker
           result <- tryCatch({

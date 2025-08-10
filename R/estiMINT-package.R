@@ -8,13 +8,15 @@
 #' @importFrom ranger  ranger
 #' @importFrom future plan multisession
 #' @importFrom future.apply future_lapply future_sapply
-#' @importFrom utils modifyList zip unzip read.csv write.csv capture.output
+#' @importFrom utils modifyList zip unzip read.csv write.csv capture.output str
 #' @importFrom lhs maximinLHS
 #' @importFrom tools md5sum
 #' @importFrom piggyback pb_upload pb_download pb_list pb_new_release pb_releases
 #' @importFrom rappdirs user_cache_dir
+#' @importFrom dplyr `%>%`
 #' @importFrom R.utils withTimeout
 #' @importFrom gh gh gh_token
+#' @importFrom stats ave cor median predict quantile runif
 #' @importFrom httr RETRY add_headers upload_file status_code
 #' @importFrom progressr with_progress progressor handlers
 #' @importFrom ggplot2 ggplot aes geom_point geom_abline geom_smooth geom_bar
