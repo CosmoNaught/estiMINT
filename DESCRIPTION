@@ -20,7 +20,7 @@ Imports:
     gh,
     lhs,
     R.utils,
-    piggyback,
+    piggyback (>= 0.1.5.9006),
     rappdirs,
     tools,
     progressr,
@@ -33,4 +33,5 @@ Imports:
 Suggests:
     testthat (>= 3.0.0),
     bit64
+Additional_repositories: https://ropensci.r-universe.dev
 Config/testthat/edition: 3
