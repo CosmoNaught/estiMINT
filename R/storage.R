@@ -167,3 +167,43 @@ save_xgb_model <- function(model_dir,
           "Commit & reinstall to ship updated 'inst/models-*'.")
   invisible(tag)
 }
+
+#' Load model onto memory for usage
+#'
+#' @param path Optional path to .rds file or a directory containing estiMINT_model.rds.
+#'   If NULL, tries (in order): ESTIMINT_MODELS_DIR env var, a packaged RDS in inst/extdata,
+#'   then piggyback download using inst/models-tag.txt.
+#' @return An 'estiMINT_model' object
+#' @export
+load_xgb_model <- function(path = NULL) {
+  # 1) explicit path or directory
+  if (!is.null(path)) {
+    if (dir.exists(path)) path <- .resolve_model_file(path)
+    if (!file.exists(path)) stop("Model file not found at: ", path)
+    obj <- readRDS(path)
+    if (!inherits(obj, "estiMINT_model")) warning("Loaded object does not inherit 'estiMINT_model'")
+    return(obj)
+  }
+
+  override <- Sys.getenv("ESTIMINT_MODELS_DIR", "")
+  if (nzchar(override)) {
+    p <- .resolve_model_file(override)
+    obj <- readRDS(p)
+    if (!inherits(obj, "estiMINT_model")) warning("Loaded object does not inherit 'estiMINT_model'")
+    return(obj)
+  }
+
+  inst <- .find_installed_model()
+  if (!is.null(inst)) {
+    obj <- readRDS(inst)
+    if (!inherits(obj, "estiMINT_model")) warning("Loaded object does not inherit 'estiMINT_model'")
+    return(obj)
+  }
+
+  root <- .model_root(.models_tag())
+  if (!file.exists(file.path(root, ".ok"))) .ensure_models(.models_tag())
+  p <- .resolve_model_file(root)
+  obj <- readRDS(p)
+  if (!inherits(obj, "estiMINT_model")) warning("Loaded object does not inherit 'estiMINT_model'")
+  obj
+}

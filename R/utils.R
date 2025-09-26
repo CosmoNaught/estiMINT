@@ -69,3 +69,29 @@ scale_pos <- function(obs, pred) {
   if (!is.finite(a) || a <= 0) a <- 1.0
   a
 }
+
+#' @noRd
+.find_installed_model <- function() {
+  cand <- c(
+    system.file("extdata", "eir_model", "estiMINT_model.rds", package = "estiMINT"),
+    system.file("extdata", "estiMINT_model.rds", package = "estiMINT"),
+    system.file("estiMINT_model.rds", package = "estiMINT")
+  )
+  cand <- cand[nzchar(cand) & file.exists(cand)]
+  if (length(cand)) cand[[1]] else NULL
+}
+
+#' @noRd
+.resolve_model_file <- function(dir_or_file) {
+  if (file.exists(dir_or_file) && !dir.exists(dir_or_file)) return(dir_or_file)
+  d <- normalizePath(dir_or_file, mustWork = TRUE)
+  candidates <- c(
+    file.path(d, "estiMINT_model.rds"),
+    file.path(d, "eir_model", "estiMINT_model.rds")
+  )
+  for (p in candidates) if (file.exists(p)) return(p)
+  hit <- list.files(d, pattern = "\\.rds$", recursive = TRUE, full.names = TRUE)
+  hit <- hit[basename(hit) == "estiMINT_model.rds"]
+  if (length(hit)) return(hit[[1]])
+  stop("Could not find 'estiMINT_model.rds' under: ", d)
+}

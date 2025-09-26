@@ -1,20 +1,3 @@
-#' Load model onto memory for usage
-#' 
-#' @param path Path to .rds file or to a models directory containing estiMINT_model.rds
-#' @return An 'estiMINT_model' object
-#' @export
-load_xgb_model <- function(path) {
-  stopifnot(length(path) == 1)
-  if (dir.exists(path)) {
-    cand <- file.path(path, "estiMINT_model.rds")
-    if (file.exists(cand)) path <- cand
-  }
-  if (!file.exists(path)) stop("Model file not found at: ", path)
-  obj <- readRDS(path)
-  if (!inherits(obj, "estiMINT_model")) warning("Loaded object does not inherit 'estiMINT_model'")
-  obj
-}
-
 #' Run xgb model with initial conditons
 #' 
 #' @param new_data Data frame with columns: prevalence (or prev_y9), dn0_use, Q0, phi_bednets,
