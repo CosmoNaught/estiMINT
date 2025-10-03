@@ -36,7 +36,6 @@
   file.path(.model_cache_dir(), "models", tag)
 }
 
-# Download <tag>.zip to cache (once) and verify checksums if present
 #' @noRd
 .ensure_models <- function(tag = .models_tag()) {
   root <- .model_root(tag)
@@ -60,25 +59,35 @@
 
   utils::unzip(zipfile, exdir = root)
 
+  # ----- robust checksum verification -----
   chks <- .models_checksums()
   if (!is.null(chks)) {
-    if (!requireNamespace("tools", quietly = TRUE))
-      stop("Please install 'tools' (base-recommended) for checksum verification.")
     full <- file.path(root, chks$path)
     have <- tools::md5sum(full)
     want <- setNames(chks$md5, chks$path)
-    # align by relative path
-    have_rel <- gsub(paste0("^", gsub("\\\\","/", root), "/?"), "", gsub("\\\\","/", names(have)))
-    bad <- unname(have) != unname(want[have_rel])
-    if (any(bad)) {
-      unlink(root, recursive = TRUE, force = TRUE)
-      stop("Model checksum verification failed.")
+
+    have_rel <- basename(names(have))                  # simpler + stable
+    want_by_base <- setNames(chks$md5, basename(chks$path))
+
+    bad <- is.na(have) | is.na(want_by_base[have_rel]) |
+          (unname(have) != unname(want_by_base[have_rel]))
+
+    if (any(bad, na.rm = TRUE)) {
+      missing_files <- have_rel[is.na(have)]
+      missing_checksums <- have_rel[is.na(want_by_base[have_rel])]
+      msg <- c()
+      if (length(missing_files))    msg <- c(msg, paste("missing files:", paste(missing_files, collapse=", ")))
+      if (length(missing_checksums))msg <- c(msg, paste("no checksums for:", paste(missing_checksums, collapse=", ")))
+      stop("Model checksum verification failed", if (length(msg)) paste0(" (", paste(msg, collapse="; "), ")"))
     }
   }
+
+  # ----------------------------------------
 
   file.create(file.path(root, ".ok"))
   invisible(root)
 }
+
 
 # Find estiMINT_model.rds inside a directory (or accept a direct file)
 #' @noRd
